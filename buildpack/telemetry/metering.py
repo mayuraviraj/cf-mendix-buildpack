@@ -2,7 +2,6 @@ import logging
 import os
 import json
 import subprocess
-
 from buildpack import util
 from buildpack.infrastructure import database
 
@@ -21,10 +20,28 @@ def _download(buildpack_dir, build_path, cache_dir):
         cache_dir=cache_dir,
     )
 
-
 def _is_usage_metering_enabled():
-    if "MXUMS_LICENSESERVER_URL" in os.environ:
+    """Determine if metering should be enabled based on environment ids and license server config."""
+    skip_environments = [
+        "dd6a06c9-b383-4e63-a4ad-e3a272f8acb5",
+        "ac378eea-6f7e-4161-b6c7-42c95650e614",
+    ]
+
+    env = os.getenv("MXUMS_ENVIRONMENT_NAME", "").strip().lower()
+    license_url = os.getenv("MXUMS_LICENSESERVER_URL")
+
+    # Case 1: Environment is in skip list → always disable metering
+    if env in [s.lower() for s in skip_environments]:
+        logging.info(f"Skipping metering because environment '{env}' is in skip list.")
+        return False
+
+    # Case 2: Environment is not in skip list → check license server variable
+    if license_url:
+        logging.info("MXUMS_LICENSESERVER_URL is set. Enabling metering.")
         return True
+    else:
+        logging.info("MXUMS_LICENSESERVER_URL is not set. Disabling metering.")
+        return False
 
 
 def _get_project_id(file_path):
